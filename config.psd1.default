@@ -1,0 +1,46 @@
+﻿@{
+    AD = @{
+        
+
+        # Базовый LDAP-фильтр
+        SearchBase      = "OU=Employees,DC=mycompany,DC=com"
+#        LDAPFilter      = '(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))'
+        LDAPFilter      = "(objectClass=user)"
+        EnabledOnly     = $true
+        RequirePhone    = $true
+        PhoneAttribute  = "mobile"
+        MaxUsersPerRun  = 100
+    }
+
+    PasswordPolicy = @{
+        MinLength       = 9
+        MaxLength       = 12
+        AllowedSpecials = "!@#$%&*"
+
+        Salt = @{
+            Enabled     = $true            # включить/выключить модификацию для SMS
+            AllowedOps  = @('p','m')       # какие операции разрешены: 'p' (plus), 'm' (minus)
+            MaxSalt     = 10               # максимальное значение соли (ограничение сверху)
+            NumberWidth = 2                # сколько цифр в числовой части пароля (пока захардкожено 2)
+        }
+    }
+
+    SMS = @{
+        Provider     = "sms.ru"
+        BaseUrl      = "https://sms.ru/sms/send"
+        AuthCheckUrl = "https://sms.ru/auth/check"
+        StatusUrl    = "https://sms.ru/sms/status"
+        ApiId        = ""   # <<< сюда вставить реальный api_id
+        From         = "SecureOps"
+        TimeoutSec   = 15
+        TextTemplate = "ZIM: Ваш новый секрет: {{Password}}"
+        SuccessCodes = @(100)
+        TestMode     = $false
+    }
+
+    Runtime = @{
+        LogDir        = "Logs"
+        DebugModeMain = $true
+        DebugModeSms  = $false
+    }
+}
