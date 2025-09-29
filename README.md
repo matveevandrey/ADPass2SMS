@@ -95,6 +95,27 @@ Register-ScheduledTask `
 - Пароли никогда не пишутся в текстовые логи (заменяются на `***`).
 - Отладочный вывод можно включать выборочно (для Main или SMS).
 - Пароль пользователя в SMS можно маскировать с помощью механизма соли.
+- Для запуска скрипта рекоментуется использовать отдельную учетную запись с ограниченными правами
+```
+# Создаём OU для сервисных аккаунтов (если ещё нет)
+New-ADOrganizationalUnit -Name "ServiceAccounts" -Path "DC=mycompany,DC=com" -ProtectedFromAccidentalDeletion $true
+
+# Создаём сервисный аккаунт
+New-ADUser `
+    -Name "svc_adpass2sms" `
+    -SamAccountName "svc_adpass2sms" `
+    -UserPrincipalName "svc_adpass2sms@mycompany.com" `
+    -AccountPassword (ConvertTo-SecureString "SuperStrongPassw0rd!" -AsPlainText -Force) `
+    -Enabled $true `
+    -Path "OU=ServiceAccounts,DC=mycompany,DC=com" `
+    -PasswordNeverExpires $true `
+    -Description "Сервисная учётка для ADPass2SMS (ротация паролей)"
+
+dsacls "OU=Employees,DC=mycompany,DC=com" /I:S /G "MYCOMPANY\svc_adpass2sms:CA;Reset Password"
+dsacls "OU=Employees,DC=mycompany,DC=com" /I:S /G "MYCOMPANY\svc_adpass2sms:CA;Change Password"
+# Иногда нужно дополнительные права на чтение атрибутов
+# dsacls "OU=Employees,DC=mycompany,DC=com" /I:S /G "MYCOMPANY\svc_adpass2sms:RP;user"
+```
 
 ---
 
