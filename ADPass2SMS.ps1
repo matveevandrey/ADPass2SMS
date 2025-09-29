@@ -5,6 +5,8 @@
   Загружает конфиг, модули, получает пользователей, генерирует пароль
   (с опциональной солью), отправляет SMS (обфусцированную версию + спеки)
   и меняет реальный пароль в AD только при успешной приёмке шлюзом.
+  Если смена пароля в AD не удалась — отправляется fallback-SMS с сообщением
+  о том, что используется старый пароль.
 #>
 
 [CmdletBinding()]
@@ -59,6 +61,7 @@ foreach ($u in $users) {
     $smsId = ''
     $smsStatus = ''
     $adChanged = $false
+    $smsSent = $false
     $errorMessage = ''
 
     try {
@@ -97,6 +100,7 @@ foreach ($u in $users) {
         $smsResp = Send-SmsRuMessage -SmsConfig $config.SMS -Phone $phone -Message $msg
         if (-not $smsResp.Ok) { throw "SMS send failed: $($smsResp.Error)" }
         $smsId = $smsResp.SmsId
+        $smsSent = $true
         Write-Log "SMS accepted by gateway, id=${smsId}" "INFO" -Channel Sms
 
         # Мы считаем доставкой на уровне шлюза (ACCEPTED)
@@ -110,7 +114,19 @@ foreach ($u in $users) {
             Write-Log "AD password changed for ${sam}" "INFO" -Channel Main
         }
         catch {
-            throw "AD password change failed: $($_.Exception.Message)"
+            $errorMessage = "AD password change failed: $($_.Exception.Message)"
+            Write-Log "Error processing ${sam}: ${errorMessage}" "ERROR" -Channel Main
+
+            # Если SMS отправлено, но пароль не изменился — отправляем fallback
+            if ($smsSent -and -not $adChanged -and $phone) {
+                $fallbackMsg = $config.SMS.TextTemplateFallback.Replace("{{UserName}}",$sam)
+                $fbResp = Send-SmsRuMessage -SmsConfig $config.SMS -Phone $phone -Message $fallbackMsg
+                if ($fbResp.Ok) {
+                    Write-Log "Fallback SMS sent to ${sam} (${phone})" "INFO" -Channel Sms
+                } else {
+                    Write-Log "Fallback SMS failed for ${sam}: $($fbResp.Error)" "ERROR" -Channel Sms
+                }
+            }
         }
     }
     catch {
